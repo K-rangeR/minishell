@@ -18,6 +18,8 @@
 #define MAX_CWD 200
 
 /* Helper functions */
+void readCharByChar(char *buf);
+void tabComplete(char *buf);
 void runCommand(CMD command);
 void doubleFork(CMD command, int pipeFd[2], int forCmd1);
 void singleFork(CMD command, int pipeFd[2]);
@@ -42,7 +44,7 @@ int main()
 	while (1) {
 		getcwd(cwd, MAX_CWD);
 		printf("%s $ ", cwd);
-		fgets(buf, MAX_BUF-1, stdin);
+		readCharByChar(buf);
 		n = cmdparse(buf, &command);
 
 		if (n == PARSE_ERROR) {
@@ -58,6 +60,27 @@ int main()
 	}
 
 	return 0;
+}
+
+void readCharByChar(char *buf)
+{
+	int c;
+	int n;
+	
+	n = 0;
+	while ((c = fgetc(stdin)) != '\n') {
+		if (c == '\t')
+			tabComplete(buf);
+		else
+			buf[n++] = c;
+	}
+
+	buf[n] = '\0';
+}
+
+void tabComplete(char *buf)
+{
+
 }
 
 /*
