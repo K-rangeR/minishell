@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <dirent.h>
+#include <termios.h>
 #include "cmdparse.h"
 
 /* Determines the mode to use when using output redirection */
@@ -14,11 +16,15 @@
 #define READ  0
 #define WRITE 1
 
-#define MAX_BUF 101
+#define MAX_BUF 300
 #define MAX_CWD 200
 
+#define DEL 127
+
 /* Helper functions */
-void readCharByChar(char *buf);
+int  goNonCanon();
+void goCanon();
+int  setupPrompt();
 void tabComplete(char *buf);
 void runCommand(CMD command);
 void doubleFork(CMD command, int pipeFd[2], int forCmd1);
@@ -29,6 +35,9 @@ void processPipe(int pipeFd[2], int isPipeWriter);
 void redirectInput(CMD command);
 void redirectOutput(CMD command);
 
+char           cwd[MAX_CWD];
+struct termios oldTerminal;
+
 /*
  * This is a simple shell application that supports some common
  * shell actions such as input and output redirection, pipes, and
@@ -38,49 +47,122 @@ int main()
 {
 	CMD  command;
 	char buf[MAX_BUF];
-	char cwd[MAX_CWD];
+	char c;
 	int  n;
+	int  cursor;
+	int  startOfCmd;
 
-	while (1) {
-		getcwd(cwd, MAX_CWD);
-		printf("%s $ ", cwd);
-		readCharByChar(buf);
-		n = cmdparse(buf, &command);
+	if (goNonCanon() < 0) {
+		printf("Could not setup terminal\n");
+		return 1;
+	}
 
-		if (n == PARSE_ERROR) {
- 			fprintf(stderr, "parse error\n");
-			continue;
-		} else if (n == NO_INPUT) {
-			continue;
-		} else if (strcmp(command.argv1[0], "exit") == 0) {
-			break;
+	startOfCmd = setupPrompt(buf);
+	cursor = startOfCmd;
+	while (read(STDIN_FILENO, &c, 1) == 1) {
+		switch (c) {
+			case DEL:
+				if (cursor > startOfCmd) {
+					cursor--;
+					char delbuf[] = "\b \b";
+					write(STDOUT_FILENO, delbuf, strlen(delbuf));
+				}
+				break;
+			case '\n':
+				printf("\n");
+				n = cmdparse(&buf[startOfCmd], &command);
+				if (n == PARSE_ERROR) {
+ 					fprintf(stderr, "parse error\n");
+					continue;
+				} else if (n == NO_INPUT) {
+					continue;
+				} else if (strcmp(command.argv1[0], "exit") == 0) {
+					goCanon();
+					return 0;
+				}
+				runCommand(command);
+				startOfCmd = setupPrompt(buf);
+				cursor = startOfCmd;
+				break;
+			case '\t':
+				tabComplete(buf);
+				break;
+			default:
+				buf[cursor++] = c;
+				write(STDOUT_FILENO, &c, sizeof(c));
 		}
+	}
+	
+	return 0;
+}
 
-		runCommand(command);
+/*
+ * Switches the terminal IO to noncanonical mode for
+ * command input processing
+ */
+int goNonCanon()
+{
+	struct termios term;
+
+	if (tcgetattr(STDIN_FILENO, &term) < 0)
+		return -1;	
+	oldTerminal = term;
+
+	/* Config the new terminal mode */
+	term.c_lflag &= ~(ECHO | ICANON);
+	term.c_cc[VMIN] = 1;
+	term.c_cc[VTIME] = 0;
+
+	if (tcsetattr(STDIN_FILENO, TCSANOW, &term) < 0)
+		return -1;
+	
+	/* Check that all terminal changes were made */
+	if (tcgetattr(STDIN_FILENO, &term) < 0) {
+		tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTerminal); // restore old terminal
+		return -1;
+	}
+	if ((term.c_lflag & (ECHO | ICANON)) || term.c_cc[VMIN] != 1 || term.c_cc[VTIME] != 0) {
+		tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTerminal);
+		return -1;
 	}
 
 	return 0;
 }
 
-void readCharByChar(char *buf)
+/*
+ * Switches the terminal IO back to canonical mode upon exit
+ */
+void goCanon()
 {
-	int c;
-	int n;
-	
-	n = 0;
-	while ((c = fgetc(stdin)) != '\n') {
-		if (c == '\t')
-			tabComplete(buf);
-		else
-			buf[n++] = c;
-	}
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldTerminal);
+}
 
-	buf[n] = '\0';
+int setupPrompt(char *buf)
+{
+	int startOfCmd;
+
+	memset(buf, '\0', MAX_BUF);
+	getcwd(cwd, MAX_CWD);
+	startOfCmd = strlen(cwd) + 3 + 1;
+	strcat(cwd, " $ ");
+	strcpy(buf, cwd);
+	write(STDOUT_FILENO, buf, strlen(buf));
+	return startOfCmd;
 }
 
 void tabComplete(char *buf)
 {
+	DIR           *dir;
+	struct dirent *currFile;
 
+	if ((dir = opendir(cwd)) == NULL) {
+		printf("tabComplete: could not read directory: %s\n", strerror(errno));
+		return;
+	}
+
+	while ((currFile = readdir(dir)) != NULL) {
+		printf("%s\n", currFile->d_name);
+	}
 }
 
 /*
