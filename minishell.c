@@ -157,6 +157,11 @@ int setupPrompt(char *buf)
 	return startOfCmd;
 }
 
+/*
+ * Attempts to autocomplete the file name or directory
+ * name that user started to type. It will return the 
+ * number characters added to complete the name.
+ */
 int tabComplete(char *buf)
 {
 	int           ndx;
