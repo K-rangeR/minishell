@@ -213,6 +213,8 @@ void tabComplete(char *buf)
 		strcat(buf, &completedFile[strlen(finalToken)]);
 		write(STDOUT_FILENO, &completedFile[strlen(finalToken)], strlen(completedFile));
 	}
+
+	closedir(dir);
 }
 
 /*
