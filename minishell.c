@@ -63,6 +63,7 @@ int main()
 		switch (c) {
 			case DEL:
 				if (cursor > startOfCmd) {
+					buf[cursor] = '\0';
 					cursor--;
 					char delbuf[] = "\b \b";
 					write(STDOUT_FILENO, delbuf, strlen(delbuf));
@@ -85,7 +86,7 @@ int main()
 				cursor = startOfCmd;
 				break;
 			case '\t':
-				tabComplete(buf);
+				tabComplete(&buf[startOfCmd]);
 				break;
 			default:
 				buf[cursor++] = c;
@@ -137,31 +138,80 @@ void goCanon()
 	tcsetattr(STDIN_FILENO, TCSANOW, &oldTerminal);
 }
 
+/*
+ * Creates the command prompt that will contain the
+ * full path to the current directory and a '$'
+ */
 int setupPrompt(char *buf)
 {
-	int startOfCmd;
+	int  startOfCmd;
+	char tempCwd[MAX_CWD];
 
 	memset(buf, '\0', MAX_BUF);
 	getcwd(cwd, MAX_CWD);
+	strcpy(tempCwd, cwd);
 	startOfCmd = strlen(cwd) + 3 + 1;
-	strcat(cwd, " $ ");
-	strcpy(buf, cwd);
+	strcat(tempCwd, " $ ");
+	strcpy(buf, tempCwd);
 	write(STDOUT_FILENO, buf, strlen(buf));
 	return startOfCmd;
 }
 
 void tabComplete(char *buf)
 {
+	int           ndx;
+	int           len;
+	int           matchingFiles;
+	int           matchFound;
+	char          *token;
+	char          *finalToken;
+	char          bufCpy[strlen(buf)+1];
+	char          completedFile[100];
 	DIR           *dir;
 	struct dirent *currFile;
 
+	/* Copy the buf for tokenizing */
+	strcpy(bufCpy, buf);
+
+	/* Get the last token */
+	finalToken = NULL;
+	token = strtok(bufCpy, " ");
+	while (token != NULL) {
+		finalToken = token;
+		token = strtok(NULL, " ");
+	}
+		
 	if ((dir = opendir(cwd)) == NULL) {
 		printf("tabComplete: could not read directory: %s\n", strerror(errno));
 		return;
 	}
 
+	matchingFiles = 0;
 	while ((currFile = readdir(dir)) != NULL) {
-		printf("%s\n", currFile->d_name);
+		// set loop counter to the smallest string length
+		if (strlen(currFile->d_name) < strlen(finalToken))
+			len = strlen(currFile->d_name);
+		else
+			len = strlen(finalToken);
+
+		matchFound = 1;
+		for (ndx = 0; ndx < len; ndx++) {
+			if (currFile->d_name[ndx] != finalToken[ndx]) {
+				matchFound = 0;
+				break;
+			}
+		}
+
+		if (matchFound) {
+			strcpy(completedFile, currFile->d_name);
+			matchingFiles++;
+		}
+	}
+
+	// complete nothing if more than one file can match
+	if (matchingFiles == 1) {
+		strcat(buf, &completedFile[strlen(finalToken)]);
+		write(STDOUT_FILENO, &completedFile[strlen(finalToken)], strlen(completedFile));
 	}
 }
 
