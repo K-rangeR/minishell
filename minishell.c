@@ -25,7 +25,7 @@
 int  goNonCanon();
 void goCanon();
 int  setupPrompt();
-void tabComplete(char *buf);
+int  tabComplete(char *buf);
 void runCommand(CMD command);
 void doubleFork(CMD command, int pipeFd[2], int forCmd1);
 void singleFork(CMD command, int pipeFd[2]);
@@ -86,7 +86,7 @@ int main()
 				cursor = startOfCmd;
 				break;
 			case '\t':
-				tabComplete(&buf[startOfCmd]);
+				cursor += tabComplete(&buf[startOfCmd]);
 				break;
 			default:
 				buf[cursor++] = c;
@@ -157,12 +157,13 @@ int setupPrompt(char *buf)
 	return startOfCmd;
 }
 
-void tabComplete(char *buf)
+int tabComplete(char *buf)
 {
 	int           ndx;
 	int           len;
 	int           matchingFiles;
 	int           matchFound;
+	int           charsAdded;
 	char          *token;
 	char          *finalToken;
 	char          bufCpy[strlen(buf)+1];
@@ -183,9 +184,10 @@ void tabComplete(char *buf)
 		
 	if ((dir = opendir(cwd)) == NULL) {
 		printf("tabComplete: could not read directory: %s\n", strerror(errno));
-		return;
+		return 0;
 	}
 
+	charsAdded = 0;
 	matchingFiles = 0;
 	while ((currFile = readdir(dir)) != NULL) {
 		// set loop counter to the smallest string length
@@ -212,9 +214,11 @@ void tabComplete(char *buf)
 	if (matchingFiles == 1) {
 		strcat(buf, &completedFile[strlen(finalToken)]);
 		write(STDOUT_FILENO, &completedFile[strlen(finalToken)], strlen(completedFile));
+		charsAdded = strlen(&completedFile[strlen(finalToken)]);
 	}
 
 	closedir(dir);
+	return charsAdded;
 }
 
 /*
