@@ -93,20 +93,21 @@ int main()
 				write(STDOUT_FILENO, &c, sizeof(c));
 		}
 	}
-	
+
 	return 0;
 }
 
 /*
  * Switches the terminal IO to noncanonical mode for
- * command input processing
+ * command input processing, returns -1 if there is
+ * an error, or 0 of successful
  */
 int goNonCanon()
 {
 	struct termios term;
 
 	if (tcgetattr(STDIN_FILENO, &term) < 0)
-		return -1;	
+		return -1;
 	oldTerminal = term;
 
 	/* Config the new terminal mode */
@@ -116,7 +117,7 @@ int goNonCanon()
 
 	if (tcsetattr(STDIN_FILENO, TCSANOW, &term) < 0)
 		return -1;
-	
+
 	/* Check that all terminal changes were made */
 	if (tcgetattr(STDIN_FILENO, &term) < 0) {
 		tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTerminal); // restore old terminal
@@ -159,7 +160,7 @@ int setupPrompt(char *buf)
 
 /*
  * Attempts to autocomplete the file name or directory
- * name that user started to type. It will return the 
+ * name that user started to type. It will return the
  * number characters added to complete the name.
  */
 int tabComplete(char *buf)
@@ -186,7 +187,7 @@ int tabComplete(char *buf)
 		finalToken = token;
 		token = strtok(NULL, " ");
 	}
-		
+
 	if ((dir = opendir(cwd)) == NULL) {
 		printf("tabComplete: could not read directory: %s\n", strerror(errno));
 		return 0;
@@ -266,12 +267,12 @@ void doubleFork(CMD command, int pipeFd[2], int forCmd1)
 	forkPid = fork();
 	switch (forkPid) {
 		case -1:
-			fprintf(stderr, "parent: could not run command '%s': %s\n", 
+			fprintf(stderr, "parent: could not run command '%s': %s\n",
 					command.argv2[0], strerror(errno));
 			exit(1);
 		case 0:
 			forkPid = fork();
-			secondFork(forkPid, command, pipeFd, forCmd1);	
+			secondFork(forkPid, command, pipeFd, forCmd1);
 		default:
 			if (!forCmd1)
 				close(pipeFd[0]); close(pipeFd[1]);
@@ -300,7 +301,7 @@ void secondFork(long forkPid, CMD command, int pipeFd[2], int forCmd1)
 			fprintf(stderr, "doubleFork: second fork fail: %s\n", strerror(errno));
 			exit(1);
 		case 0:
-			child(command, pipeFd, forCmd1);	
+			child(command, pipeFd, forCmd1);
 		default:
 			exit(0);
 	}
@@ -327,7 +328,7 @@ void singleFork(CMD command, int pipeFd[2])
 				forkPid2 = fork();
 				switch (forkPid2) {
 					case -1:
-						fprintf(stderr, "parent: could not run command: %s\n", 
+						fprintf(stderr, "parent: could not run command: %s\n",
 							 		strerror(errno));
 					break;
 				case 0:
@@ -336,7 +337,7 @@ void singleFork(CMD command, int pipeFd[2])
 				default:
 					close(pipeFd[0]); close(pipeFd[1]);
 					if (waitpid(forkPid2, 0, 0) == -1)
-						fprintf(stderr, "singleFork: could not wait on child: %s\n", 
+						fprintf(stderr, "singleFork: could not wait on child: %s\n",
 									strerror(errno));
 					fflush(stderr);
 				}
@@ -352,11 +353,11 @@ void singleFork(CMD command, int pipeFd[2])
 void child(CMD command, int pipeFd[2], int isPipeWriter)
 {
 	if (command.pipelining)
-		processPipe(pipeFd, isPipeWriter);	
+		processPipe(pipeFd, isPipeWriter);
 
 	if (command.redirectIn && isPipeWriter)
 		redirectInput(command);
-	
+
 	if ((command.redirectOut && !isPipeWriter) || (command.redirectOut && !command.pipelining))
 		redirectOutput(command);
 
@@ -401,7 +402,7 @@ void redirectInput(CMD command)
 	int fd;
 
 	if ((fd = open(command.infile, O_RDONLY, 0)) < 0) {
-		fprintf(stderr, "could not open the input file: %s\n", strerror(errno));	
+		fprintf(stderr, "could not open the input file: %s\n", strerror(errno));
 		exit(1);
 	}
 	if (dup2(fd, STDIN_FILENO) == -1) {
