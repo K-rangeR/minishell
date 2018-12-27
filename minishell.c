@@ -13,14 +13,12 @@
 /* Determines the mode to use when using output redirection */
 #define OUTPUT_MODE(n) ((n) ? O_WRONLY|O_APPEND|O_CREAT : O_TRUNC|O_WRONLY|O_CREAT )
 
-/* index into the pipe array */
 #define READ  0
 #define WRITE 1
-
 #define MAX_BUF 300
 #define MAX_CWD 200
-
 #define DEL 127
+#define PROMPTLEN 3
 
 char           cwd[MAX_CWD];
 struct termios oldTerminal;
@@ -138,7 +136,7 @@ int setupPrompt(char *buf)
 	memset(buf, '\0', MAX_BUF);
 	getcwd(cwd, MAX_CWD);
 	strcpy(tempCwd, cwd);
-	startOfCmd = strlen(cwd) + 3 + 1;
+	startOfCmd = strlen(cwd) + PROMPTLEN + 1; // 1 for a space after prompt
 	strcat(tempCwd, " $ ");
 	strcpy(buf, tempCwd);
 	write(STDOUT_FILENO, buf, strlen(buf));
