@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include "cmdparse.h"
+#include "minishell.h"
 
 /* Determines the mode to use when using output redirection */
 #define OUTPUT_MODE(n) ((n) ? O_WRONLY|O_APPEND|O_CREAT : O_TRUNC|O_WRONLY|O_CREAT )
@@ -20,20 +21,6 @@
 #define MAX_CWD 200
 
 #define DEL 127
-
-/* Helper functions */
-int  goNonCanon();
-void goCanon();
-int  setupPrompt();
-int  tabComplete(char *buf);
-void runCommand(CMD command);
-void doubleFork(CMD command, int pipeFd[2], int forCmd1);
-void singleFork(CMD command, int pipeFd[2]);
-void secondFork(long forkPid, CMD command, int pipeFd[2], int forCmd1);
-void child(CMD command, int pipeFd[2], int isPipeWriter);
-void processPipe(int pipeFd[2], int isPipeWriter);
-void redirectInput(CMD command);
-void redirectOutput(CMD command);
 
 char           cwd[MAX_CWD];
 struct termios oldTerminal;
