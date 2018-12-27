@@ -37,7 +37,7 @@ int main()
 	int  cursor;
 	int  startOfCmd;
 
-	if (goNonCanon() < 0) {
+	if (goNonCanonical() < 0) {
 		printf("Could not setup terminal\n");
 		return 1;
 	}
@@ -63,7 +63,7 @@ int main()
 				} else if (n == NO_INPUT) {
 					continue;
 				} else if (strcmp(command.argv1[0], "exit") == 0) {
-					goCanon();
+					goCanonical();
 					return 0;
 				}
 				runCommand(command);
@@ -87,7 +87,7 @@ int main()
  * command input processing, returns -1 if there is
  * an error, or 0 of successful
  */
-int goNonCanon()
+int goNonCanonical()
 {
 	struct termios term;
 
@@ -119,7 +119,7 @@ int goNonCanon()
 /*
  * Switches the terminal IO back to canonical mode upon exit
  */
-void goCanon()
+void goCanonical()
 {
 	tcsetattr(STDIN_FILENO, TCSANOW, &oldTerminal);
 }

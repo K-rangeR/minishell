@@ -1,8 +1,8 @@
 #ifndef _MINISHELL_
 #define _MINISHELL_
 
-int  goNonCanon();
-void goCanon();
+int  goNonCanonical();
+void goCanonical();
 int  setupPrompt();
 int  tabComplete(char *buf);
 void runCommand(CMD command);
